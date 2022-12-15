@@ -15,3 +15,11 @@ class GravityModel():
 
     def step(delta: Number):
         pass
+
+class ModelRunner():
+    def __init__(self, model: GravityModel):
+        self.model = model
+
+    def run(self, num_steps: int, delta: Number):
+        for _ in range(num_steps):
+            self.model.step(delta)

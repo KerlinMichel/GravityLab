@@ -1,5 +1,5 @@
 
-from gravity_model import CoordinateSystem
+from gravity_lab.gravity_model import CoordinateSystem
 
 class CartesianCoordinateSystem(CoordinateSystem):
     pass

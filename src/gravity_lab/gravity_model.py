@@ -5,6 +5,9 @@ class Object():
         self.coordinate = coordinate
 
 class CoordinateSystem():
+    def __init__(self, dimension: int):
+        self.dimension = dimension
+
     def at_coordinate(coordinate: list[int]) -> Object:
         pass
 

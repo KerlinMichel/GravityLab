@@ -20,7 +20,7 @@ class NewtonianMechanicsModel(GravityModel):
             object.coordinate += object.velocity * delta
 
             G = gravitational_constant
-            gravity_force = Vector([0.0, 0.0, 0.0])
+            gravity_force = Vector([0.0] * self.coordinate_system.dimension)
             for other_object in self.objects:
                 if object != other_object:
                     r_vec: Vector = object.coordinate - other_object.coordinate

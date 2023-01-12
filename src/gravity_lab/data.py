@@ -1,4 +1,5 @@
 from datetime import datetime
+import re
 
 import requests
 
@@ -70,6 +71,8 @@ def jpl_horizons_ephemeris_vector(body_id: int, center: str = "@0"):
     n = 4
     vector_data_lines = [vector_data_lines[i:i+n] for i in range(0, len(vector_data_lines), n)]
 
+    # TODO: verify that all JPL Horizons Vector data always uses km units. Currently assuming
+    # this is true and converting values to m
     vector_data = []
     for vector_data_strs in vector_data_lines:
         date_data = vector_data_strs[0].split(' ')
@@ -84,45 +87,45 @@ def jpl_horizons_ephemeris_vector(body_id: int, center: str = "@0"):
                     offset += 1
 
                 value = float(position_data[i+offset][1:])
-                position_vector['x'] = value
+                position_vector['x'] = value * 1000.0
             elif position_data[i] == 'Y':
                 if position_data[i+offset] == '=':
                     offset += 1
 
                 value = float(position_data[i+offset][1:])
-                position_vector['y'] = value
+                position_vector['y'] = value * 1000.0
             elif position_data[i] == 'Z':
                 if position_data[i+offset] == '=':
                     offset += 1
 
                 value = float(position_data[i+offset][1:])
-                position_vector['z'] = value
+                position_vector['z'] = value * 1000.0
 
         velocity_data = vector_data_strs[2].split(' ')
         velocity_vector = {}
         for i in range(len(velocity_data)):
             if velocity_data[i] == 'VX' or velocity_data[i] == 'VX=':
                 value = float(velocity_data[i+1])
-                velocity_vector['x'] = value
+                velocity_vector['x'] = value * 1000.0
                 continue
             elif velocity_data[i] == 'VY' or velocity_data[i] == 'VY=':
                 value = float(velocity_data[i+1])
-                velocity_vector['y'] = value
+                velocity_vector['y'] = value * 1000.0
                 continue
             elif velocity_data[i] == 'VZ' or velocity_data[i] == 'VZ=':
                 value = float(velocity_data[i+1])
-                velocity_vector['z'] = value
+                velocity_vector['z'] = value * 1000.0
                 continue
 
             if velocity_data[i].startswith('VX='):
                 _, value = velocity_data[i].split('=')
-                velocity_vector['x'] = float(value)
+                velocity_vector['x'] = float(value) * 1000.0
             elif velocity_data[i].startswith('VY='):
                 _, value = velocity_data[i].split('=')
-                velocity_vector['y'] = float(value)
+                velocity_vector['y'] = float(value) * 1000.0
             elif velocity_data[i].startswith('VZ='):
                 _, value = velocity_data[i].split('=')
-                velocity_vector['z'] = float(value)
+                velocity_vector['z'] = float(value) * 1000.0
 
         vector_data.append({
             'datetime': ephemeris_datetime,
@@ -131,3 +134,31 @@ def jpl_horizons_ephemeris_vector(body_id: int, center: str = "@0"):
         })
 
     return vector_data
+
+def jpl_horizons_body_mass_kg(body_id: int, center: str = "@0"):
+    jpl_horizons_response = jpl_horizons_request({
+        'format': 'text',
+        'COMMAND': body_id,
+        'EPHEM_TYPE': "VECTORS",
+        'CENTER': center
+    })
+
+    response_lines = jpl_horizons_response.text.split('\n')
+
+    mass_kg_regex = r"Mass(?:\,)?(?:\s*)?(?:x)?(?:\s*)?10\^(\d\d)(?:\s*)?(?:\()?kg(?:\))?(?:\s*)?=(?:\s*)(?:\~)?(\d+(?:.\d+)?)"
+
+    for line in response_lines:
+        match = re.search(mass_kg_regex, line)
+        if match:
+            power_of_10_exponent = int(match.group(1))
+            scientific_notation_coefficient = float(match.group(2))
+            return scientific_notation_coefficient * (10 ** power_of_10_exponent)
+
+    mass_g_regex = r"Mass(?:\,)?(?:\s*)?(?:x)?(?:\s*)?10\^(\d\d)(?:\s*)?(?:\()?g(?:\))?(?:\s*)?=(?:\s*)(?:\~)?(\d+(?:.\d+)?)"
+
+    for line in response_lines:
+        match = re.search(mass_g_regex, line)
+        if match:
+            power_of_10_exponent = int(match.group(1))
+            scientific_notation_coefficient = float(match.group(2))
+            return (scientific_notation_coefficient / 1000.0) * (10 ** power_of_10_exponent)

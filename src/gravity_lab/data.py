@@ -1,7 +1,29 @@
 from datetime import datetime
 import re
+from time import sleep
+from typing import Any, Mapping, Tuple, Union
 
 import requests
+
+class TrajectoryData():
+    # object_trajectories maps an index or string id to a tuple (object_data, trajectory data)
+    def __init__(self, object_trajectories: Mapping[Union[int, str], Tuple[Any, list]]) -> None:
+        self.object_trajectories = object_trajectories
+
+    @classmethod
+    def load_solar_system_from_jpl_horizons_system(cls) -> 'TrajectoryData':
+        object_trajectories = {}
+        for body_name in ["Sun", "Mercury", "Venus", "Earth", "Mars", "Jupiter", "Saturn", "Uranus", "Neptune", "Pluto"]:
+            body_jpl_horizons_id = jpl_horizons_search_major_body_id(body_name)
+            sleep(0.1)
+            vector_data = jpl_horizons_ephemeris_vector(body_jpl_horizons_id)
+            sleep(0.1)
+            mass_kg = jpl_horizons_body_mass_kg(body_jpl_horizons_id)
+            sleep(0.1)
+            object_data = {"mass_kg": mass_kg}
+            object_trajectories[body_name] = (object_data, vector_data)
+
+        return TrajectoryData(object_trajectories)
 
 JPL_HORIZONS_SYSTEM_API_URL = "https://ssd.jpl.nasa.gov/api/horizons.api"
 

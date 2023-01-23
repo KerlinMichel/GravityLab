@@ -5,7 +5,7 @@ from tkinter import ttk
 from typing import get_type_hints
 
 from gravity_lab.cartesian_coordinate_system import CartesianCoordinateSystem
-from gravity_lab.data import jpl_horizons_body_mass_kg, jpl_horizons_search_major_body_id, jpl_horizons_ephemeris_vector
+from gravity_lab.data import Data, TrajectoryData, jpl_horizons_body_mass_kg, jpl_horizons_search_major_body_id, jpl_horizons_ephemeris_vector
 from gravity_lab.gravity_model import GravityModel, ModelRunner
 from gravity_lab.math import Vector
 from gravity_lab.newtonian_mechanics_model import NewtonianMechanicsModel
@@ -54,6 +54,9 @@ class GravityLab():
         self.display_translation = [50.0, 50.0]
         self.display_2d_coord_index = [0, 1]
 
+        # [data_name: str] -> Data()
+        self.loaded_data = {}
+
         self.simulation_manager = SimulationManager()
         self.build_ui()
 
@@ -61,6 +64,17 @@ class GravityLab():
         self.update_canvas_thread = Thread(target=self.update_canvas, args=(suspend_thread_event,), daemon=True)
         self.update_canvas_thread.suspend_event = suspend_thread_event
         self.update_canvas_thread.start()
+
+    def interact_on_canvas(self, event):
+        closest_objects = self.canvas.find_closest(event.x, event.y)
+        if len(closest_objects) == 0:
+            self.add_object(event)
+        else:
+            closest_object = closest_objects[0]
+            closest_object_position = self.canvas.coords(closest_object)
+            x1, y1, _, _ = closest_object_position
+            if (Vector([event.x, event.y]) - Vector([x1, y1])).magnitude() < 10.0:
+                pass # TODO: open menu to see object details and interact with object
 
     def add_object(self, event):
         # get the type of objects used by the model
@@ -129,7 +143,7 @@ class GravityLab():
         # this happens when objects are created from JPL Horizons data. Maybe the large values from this
         # data is causing issues. Setting position to 0,0 and letting the canvas updater move the object
         # to the correct position
-        canvas_object = self.canvas.create_oval(0, 0, 8, 8)
+        canvas_object = self.canvas.create_oval(0, 0, 3, 3, fill='#000000')
         self.canvas_objects.append((canvas_object, model_object))
 
     def select_model(self, *args):
@@ -143,7 +157,7 @@ class GravityLab():
         elif self.simulation_manager.current_model.coordinate_system.dimension == 3:
             self.display_2d_coord_index = [0, 2]
 
-    def load_jpl_horizons_solar_system(self):
+    def load_jpl_horizons_solar_system_objects(self):
         self.model_var.set("NewtonianMechanicsModel:3D")
 
         for body_name in ["Sun", "Mercury", "Venus", "Earth", "Mars", "Jupiter", "Saturn", "Uranus", "Neptune", "Pluto"]:
@@ -163,13 +177,26 @@ class GravityLab():
         self.zoom_string_var.set('5e-10')
         self.display_translation = [100.0, 100.0]
 
+    def open_data_popup(self, data: Data):
+        top = tk.Toplevel(self.window)
+        top.title(data.name)
+
+    def load_jpl_horizons_solar_system_trajectory_data(self):
+        trajectory_data: TrajectoryData = TrajectoryData.load_solar_system_from_jpl_horizons_system()
+        self.loaded_data[trajectory_data.name] = trajectory_data
+        self.data_list.insert(tk.END, trajectory_data.name)
+
     def build_ui(self):
         menu_bar = tk.Menu(self.window)
         self.window.config(menu=menu_bar)
 
-        fileMenu = tk.Menu(menu_bar)
-        fileMenu.add_command(label="Solar System (Data from JPL Horizons System)", command=self.load_jpl_horizons_solar_system)
-        menu_bar.add_cascade(label="Load Initial Object Values", menu=fileMenu)
+        initial_objects_menu = tk.Menu(menu_bar)
+        initial_objects_menu.add_command(label="Solar System (Data from JPL Horizons System)", command=self.load_jpl_horizons_solar_system_objects)
+        menu_bar.add_cascade(label="Load Initial Object Values", menu=initial_objects_menu)
+
+        data_menu = tk.Menu(menu_bar)
+        data_menu.add_command(label="Solar System (Data from JPL Horizons System) Trajectory Data", command=self.load_jpl_horizons_solar_system_trajectory_data)
+        menu_bar.add_cascade(label="Load Data", menu=data_menu)
 
         left_frame = tk.Frame(self.window)
         left_frame.pack(side='left',  fill='both', padx=1, expand=True)
@@ -201,6 +228,24 @@ class GravityLab():
         separator = ttk.Separator(right_frame, orient='horizontal')
         separator.pack(fill='x')
 
+        data_label = tk.Label(right_frame, text='Data:')
+        data_label.pack()
+
+        data_list = tk.Listbox(right_frame)
+        self.data_list = data_list
+        data_list.pack()
+
+        def select_data(self, event: tk.Event):
+            list_index = int(event.widget.curselection()[0])
+            data_name = event.widget.get(list_index)
+            data = self.loaded_data[data_name]
+            self.open_data_popup(data)
+
+        self.data_list.bind('<<ListboxSelect>>', lambda event: select_data(self, event))
+
+        separator = ttk.Separator(right_frame, orient='horizontal')
+        separator.pack(fill='x')
+
         view_configs_label = tk.Label(right_frame, text='View Configs:')
         view_configs_label.pack()
 
@@ -219,7 +264,7 @@ class GravityLab():
         zoom_entry = tk.Entry(right_frame, textvariable=self.zoom_string_var)
         zoom_entry.pack()
 
-        canvas.bind("<Button-1>", self.add_object)
+        canvas.bind("<Button-1>", self.interact_on_canvas)
 
         self.window.protocol("WM_DELETE_WINDOW", self.window_close)
 

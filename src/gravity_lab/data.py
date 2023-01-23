@@ -5,9 +5,14 @@ from typing import Any, Mapping, Tuple, Union
 
 import requests
 
-class TrajectoryData():
+class Data():
+    def __init__(self, name: str):
+        self.name: str = name
+
+class TrajectoryData(Data):
     # object_trajectories maps an index or string id to a tuple (object_data, trajectory data)
-    def __init__(self, object_trajectories: Mapping[Union[int, str], Tuple[Any, list]]) -> None:
+    def __init__(self, name: str, object_trajectories: Mapping[Union[int, str], Tuple[Any, list]]):
+        super().__init__(name)
         self.object_trajectories = object_trajectories
 
     @classmethod
@@ -23,7 +28,7 @@ class TrajectoryData():
             object_data = {"mass_kg": mass_kg}
             object_trajectories[body_name] = (object_data, vector_data)
 
-        return TrajectoryData(object_trajectories)
+        return TrajectoryData("JPL Horizons Solar System", object_trajectories)
 
 JPL_HORIZONS_SYSTEM_API_URL = "https://ssd.jpl.nasa.gov/api/horizons.api"
 

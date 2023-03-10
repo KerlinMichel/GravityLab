@@ -181,6 +181,35 @@ class GravityLab():
         top = tk.Toplevel(self.window)
         top.title(data.name)
 
+        model_validation_label = tk.Label(top, text="Model Validation")
+        model_validation_label.pack()
+
+        model_validation_step_size_label = tk.Label(top, text="Model Validation Step Size:")
+        model_validation_step_size_label.pack()
+
+        self.model_validation_step_size_val = 86400.0
+
+        def update_model_validation_step_size(model_validation_step_size):
+            try:
+                self.model_validation_step_size_val = float(model_validation_step_size)
+            except:
+                pass
+
+        self.model_validation_step_size = tk.StringVar()
+        self.model_validation_step_size.trace_add("write", lambda name, index, mode : update_model_validation_step_size(self.model_validation_step_size.get()))
+        self.model_validation_step_size.set("86400")
+        model_validation_step_size = tk.Entry(top, textvariable=self.model_validation_step_size)
+        model_validation_step_size.pack()
+
+        model_validation_button = tk.Button(top)
+        model_validation_button.config(text='Run Model Validation')
+        model_validation_button.pack()
+
+        model_validation_button.bind("<Button-1>", lambda _ : data.validate_model(self.simulation_manager.current_model, self.model_validation_step_size_val))
+
+        separator = ttk.Separator(top, orient='horizontal')
+        separator.pack(fill='x')
+
     def load_jpl_horizons_solar_system_trajectory_data(self):
         trajectory_data: TrajectoryData = TrajectoryData.load_solar_system_from_jpl_horizons_system()
         self.loaded_data[trajectory_data.name] = trajectory_data

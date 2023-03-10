@@ -3,6 +3,10 @@ import re
 from time import sleep
 from typing import Any, Mapping, Tuple, Union
 
+from gravity_lab.math import Vector
+from gravity_lab.gravity_model import GravityModel
+from gravity_lab.point_particle import PointParticle
+
 import requests
 
 class Data():
@@ -14,6 +18,48 @@ class TrajectoryData(Data):
     def __init__(self, name: str, object_trajectories: Mapping[Union[int, str], Tuple[Any, list]]):
         super().__init__(name)
         self.object_trajectories = object_trajectories
+
+    def validate_model(self, model: GravityModel, delta_step: float):
+        object_name_to_model_object = {}
+        for object_name in self.object_trajectories:
+            object_data, trajectory_data = self.object_trajectories[object_name]
+            def parse_vector(vector):
+                return Vector([vector['x'], vector['y'], vector['z']])
+
+            point_particle = PointParticle(object_data['mass_kg'], parse_vector(trajectory_data[0]['position']), parse_vector(trajectory_data[0]['velocity']))
+            model.objects.append(point_particle)
+            object_name_to_model_object[object_name] = point_particle
+
+        # step through model for the duration of the trajectory data
+        total_duration_seconds = 0.0
+        for i in range(len(trajectory_data) - 1):
+            duration = trajectory_data[i+1]['datetime'] - trajectory_data[i]['datetime']
+            total_duration_seconds += duration.total_seconds()
+
+        for _ in range(int(total_duration_seconds // delta_step)):
+            model.step(delta_step)
+
+        model.step(total_duration_seconds % delta_step)
+
+        # calculate model error by comparing to trajectory data
+        error_from_trajectory_data = {}
+        for object_name in self.object_trajectories:
+            object_data, trajectory_data = self.object_trajectories[object_name]
+            object_last_trajectory_data = trajectory_data[-1]
+            def parse_vector(vector):
+                return Vector([vector['x'], vector['y'], vector['z']])
+            object_last_trajectory_position = parse_vector(object_last_trajectory_data['position'])
+            object_last_trajectory_velocity = parse_vector(object_last_trajectory_data['velocity'])
+
+            coordinate_error = (object_name_to_model_object[object_name].coordinate - object_last_trajectory_position).magnitude()
+            velocity_error = (object_name_to_model_object[object_name].velocity - object_last_trajectory_velocity).magnitude()
+
+            error_from_trajectory_data[object_name] = {
+                'coordinate_error': coordinate_error,
+                'velocity_error': velocity_error
+            }
+
+        print(error_from_trajectory_data)
 
     @classmethod
     def load_solar_system_from_jpl_horizons_system(cls) -> 'TrajectoryData':

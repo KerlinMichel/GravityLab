@@ -7,3 +7,6 @@ class PointParticle(Object):
         super().__init__(coordinate)
         self.mass = mass
         self.velocity = velocity
+
+    def __str__(self) -> str:
+        return f"<mass_kg={self.mass}, coordinate={self.coordinate}, velocity={self.velocity}>"

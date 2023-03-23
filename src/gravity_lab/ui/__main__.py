@@ -9,6 +9,8 @@ from gravity_lab.data import Data, TrajectoryData, jpl_horizons_body_mass_kg, jp
 from gravity_lab.gravity_model import GravityModel, ModelRunner
 from gravity_lab.math import Vector
 from gravity_lab.newtonian_mechanics_model import NewtonianMechanicsModel
+from gravity_lab.ui import Display2DCanvas
+
 
 class SimulationManager():
     gravity_lab_models = [
@@ -49,21 +51,11 @@ class GravityLab():
         self.window.config(bg="black")
         self.window.minsize(200, 100)
 
-        self.zoom = 1.0
-        #TODO make the 2 values below editable
-        self.display_translation = [50.0, 50.0]
-        self.display_2d_coord_index = [0, 1]
-
         # [data_name: str] -> Data()
         self.loaded_data = {}
 
         self.simulation_manager = SimulationManager()
         self.build_ui()
-
-        suspend_thread_event = Event()
-        self.update_canvas_thread = Thread(target=self.update_canvas, args=(suspend_thread_event,), daemon=True)
-        self.update_canvas_thread.suspend_event = suspend_thread_event
-        self.update_canvas_thread.start()
 
     def interact_on_canvas(self, event):
         closest_objects = self.canvas.find_closest(event.x, event.y)
@@ -75,6 +67,8 @@ class GravityLab():
             x1, y1, _, _ = closest_object_position
             if (Vector([event.x, event.y]) - Vector([x1, y1])).magnitude() < 10.0:
                 pass # TODO: open menu to see object details and interact with object
+            else:
+                self.add_object(event)
 
     def add_object(self, event):
         # get the type of objects used by the model
@@ -100,9 +94,9 @@ class GravityLab():
                 vector_entry = tk.Entry(top, textvariable=entry_str_var)
                 if param_name == 'coordinate':
                     if self.simulation_manager.current_model.coordinate_system.dimension == 2:
-                        entry_str_var.set(f"{float(click_event.x)/self.zoom - self.display_translation[0]/self.zoom},{float(click_event.y)/self.zoom - self.display_translation[1]/self.zoom}")
+                        entry_str_var.set(f"{float(click_event.x)/self.canvas.zoom - self.canvas.display_translation[0]/self.canvas.zoom},{float(click_event.y)/self.canvas.zoom - self.canvas.display_translation[1]/self.canvas.zoom}")
                     elif self.simulation_manager.current_model.coordinate_system.dimension == 3:
-                        entry_str_var.set(f"{float(click_event.x)/self.zoom - self.display_translation[0]/self.zoom},0.0,{float(click_event.y)/self.zoom - self.display_translation[1]/self.zoom}")
+                        entry_str_var.set(f"{float(click_event.x)/self.canvas.zoom - self.canvas.display_translation[0]/self.canvas.zoom},0.0,{float(click_event.y)/self.canvas.zoom - self.canvas.display_translation[1]/self.canvas.zoom}")
                 else:
                     if self.simulation_manager.current_model.coordinate_system.dimension == 2:
                         entry_str_var.set("0.0,0.0")
@@ -126,8 +120,7 @@ class GravityLab():
         model_object = model_object_type(**arguments)
         self.simulation_manager.current_model.objects.append(model_object)
 
-        canvas_object = self.canvas.create_oval(model_object.coordinate[0], model_object.coordinate[1], model_object.coordinate[0] + 8, model_object.coordinate[1] + 8)
-        self.canvas_objects.append((canvas_object, model_object))
+        self.canvas.add_object(model_object)
 
         if to_destory != None:
             to_destory.destroy()
@@ -139,12 +132,7 @@ class GravityLab():
         model_object = model_object_type(**model_object_init_params)
         self.simulation_manager.current_model.objects.append(model_object)
 
-        # TODO: there is bug where adding a shape with non zero values makes the object never appear
-        # this happens when objects are created from JPL Horizons data. Maybe the large values from this
-        # data is causing issues. Setting position to 0,0 and letting the canvas updater move the object
-        # to the correct position
-        canvas_object = self.canvas.create_oval(0, 0, 3, 3, fill='#000000')
-        self.canvas_objects.append((canvas_object, model_object))
+        self.canvas.add_object(model_object)
 
     def select_model(self, *args):
         self.simulation_manager.current_model = self.simulation_manager.model_name_to_model_map[self.model_var.get()]
@@ -175,7 +163,7 @@ class GravityLab():
             })
 
         self.zoom_string_var.set('5e-10')
-        self.display_translation = [100.0, 100.0]
+        self.canvas.display_translation = [100.0, 100.0]
 
     def open_data_popup(self, data: Data):
         top = tk.Toplevel(self.window)
@@ -233,7 +221,7 @@ class GravityLab():
         right_frame = tk.Frame(self.window)
         right_frame.pack(side='right',  fill='both', expand=True)
 
-        canvas = tk.Canvas(left_frame)
+        canvas = Display2DCanvas(left_frame)
         canvas.pack()
         self.canvas = canvas
         self.canvas_objects = []
@@ -283,7 +271,7 @@ class GravityLab():
 
         def update_zoom(zoom_str):
             try:
-                self.zoom = float(zoom_str)
+                self.canvas.zoom = float(zoom_str)
             except:
                 pass
 
@@ -293,20 +281,12 @@ class GravityLab():
         zoom_entry = tk.Entry(right_frame, textvariable=self.zoom_string_var)
         zoom_entry.pack()
 
-        canvas.bind("<Button-1>", self.interact_on_canvas)
+        self.canvas.bind("<Button-1>", self.interact_on_canvas)
 
         self.window.protocol("WM_DELETE_WINDOW", self.window_close)
 
-    def update_canvas(self, suspend_event: Event):
-        while not suspend_event.is_set():
-            sleep(1.0/60.0)
-            for canvas_object, model_object in self.canvas_objects:
-                if hasattr(model_object, 'coordinate'):
-                    self.canvas.moveto(canvas_object, (model_object.coordinate[self.display_2d_coord_index[0]] * self.zoom) + self.display_translation[0],
-                                        (model_object.coordinate[self.display_2d_coord_index[1]] * self.zoom) + self.display_translation[1])
-
     def window_close(self):
-        self.update_canvas_thread.suspend_event.set()
+        self.canvas.update_canvas_thread.suspend_event.set()
         self.simulation_manager.stop_simulation()
         self.window.destroy()
 

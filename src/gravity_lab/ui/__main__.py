@@ -66,6 +66,10 @@ class GravityLab():
             closest_object_position = self.canvas.coords(closest_object)
             x1, y1, _, _ = closest_object_position
             if (Vector([event.x, event.y]) - Vector([x1, y1])).magnitude() < 10.0:
+                model_object = self.canvas.canvas_object_to_model_object[closest_object]
+                print(f"Distance from coordinate center: {model_object.coordinate.magnitude()} m")
+                print(f"Velocity: {model_object.velocity.magnitude() / 1000.0} km/s")
+                print(model_object)
                 pass # TODO: open menu to see object details and interact with object
             else:
                 self.add_object(event)
@@ -159,7 +163,7 @@ class GravityLab():
             self.create_object({
                 "mass": mass_kg,
                 "coordinate": Vector([vector_data[0]["position"]["x"], vector_data[0]["position"]["y"], vector_data[0]["position"]["z"]]),
-                "velocity": Vector([vector_data[0]["velocity"]["x"], vector_data[0]["position"]["y"], vector_data[0]["velocity"]["z"]])
+                "velocity": Vector([vector_data[0]["velocity"]["x"], vector_data[0]["velocity"]["y"], vector_data[0]["velocity"]["z"]])
             })
 
         self.zoom_string_var.set('5e-10')

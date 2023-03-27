@@ -10,6 +10,7 @@ class Display2DCanvas(tk.Canvas):
         super().__init__(master)
 
         self.model_object_to_canvas_object = {}
+        self.canvas_object_to_model_object = {}
 
         suspend_thread_event = Event()
         self.update_canvas_thread = Thread(target=self.update_canvas, args=(suspend_thread_event,), daemon=True)
@@ -26,6 +27,7 @@ class Display2DCanvas(tk.Canvas):
     def add_object(self, model_object: Object):
         canvas_object = self.create_oval(0, 0, 3, 3, fill='#000000')
         self.model_object_to_canvas_object[model_object] = canvas_object
+        self.canvas_object_to_model_object[canvas_object] = model_object
 
     def update_canvas(self, suspend_event: Event):
         while not suspend_event.is_set():

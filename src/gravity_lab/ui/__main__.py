@@ -203,9 +203,14 @@ class GravityLab():
         separator.pack(fill='x')
 
     def load_jpl_horizons_solar_system_trajectory_data(self):
+        # BUG: When zoom is set after calling self.canvas.add_trajectory then some trajectory points
+        # don't appear on the canvas for some reason
+        self.zoom_string_var.set('5e-10')
+        self.canvas.display_translation = [100.0, 100.0]
         trajectory_data: TrajectoryData = TrajectoryData.load_solar_system_from_jpl_horizons_system()
         self.loaded_data[trajectory_data.name] = trajectory_data
         self.data_list.insert(tk.END, trajectory_data.name)
+        self.canvas.add_trajectory(trajectory_data)
 
     def build_ui(self):
         menu_bar = tk.Menu(self.window)
